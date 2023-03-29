@@ -7,40 +7,56 @@ see: https://napari.org/stable/plugins/guides.html?#widgets
 Replace code below according to your needs.
 """
 from typing import TYPE_CHECKING
+import typing
 
 from magicgui import magic_factory
-from qtpy.QtWidgets import QHBoxLayout, QPushButton, QWidget
+
+import numpy as np
+
+import napari
 
 if TYPE_CHECKING:
     import napari
 
-
-class ExampleQWidget(QWidget):
-    # your QWidget.__init__ can optionally request the napari viewer instance
-    # in one of two ways:
-    # 1. use a parameter called `napari_viewer`, as done here
-    # 2. use a type annotation of 'napari.viewer.Viewer' for any parameter
-    def __init__(self, napari_viewer):
-        super().__init__()
-        self.viewer = napari_viewer
-
-        btn = QPushButton("Click me!")
-        btn.clicked.connect(self._on_click)
-
-        self.setLayout(QHBoxLayout())
-        self.layout().addWidget(btn)
-
-    def _on_click(self):
-        print("napari has", len(self.viewer.layers), "layers")
+try:
+    import serialem
+except ImportError:
+    raise RuntimeError(
+        "This plugin requires the SerialEM Python modules to be installed. \n\n"
+    )
 
 
 @magic_factory
-def example_magic_widget(img_layer: "napari.layers.Image"):
-    print(f"you have selected {img_layer}")
+def example_magic_widget() -> napari.layers.Image:
+    serialem. ConnectToSEM(48888, "146.189.163.56")
+    print(serialem.ReportNavFile())
+    num_items = serialem.ReportNumTableItems()
+    print(num_items)
+    maps = []
+    map_coordinates = []
+    for i in range(1,int(num_items)+1):
+        print(f"Item {i}:")
+        nav_item_info = serialem.ReportOtherItem(i)
+        if int(nav_item_info[4]) == 2:
+            serialem.LoadOtherMap(i,"A")
+            image = np.asarray(serialem.bufferImage("A")).copy()
+            if image.shape[1] == 2880:
+                maps.append(image)
+                map_coordinates.append(nav_item_info[1:3])
+    return napari.layers.Image(np.array(maps), metadata={"decolace_maps": True, "decolace_map_coordinates" : map_coordinates}) 
+
+@magic_factory
+def place_center_of_shape(areas: napari.types.ShapesData) -> napari.layers.Points:
+    """Place a point at the center of each shape in the layer."""
+    points = []
+    for area in areas:
+        # area is a array of shape (N,3) which is a list of polygons
+        # Calculate the center of mass of the polygon
+        # Use shapely to calculate the center of mass
+        # https://shapely.readthedocs.io/en/stable/manual.html#object.centroid
+        points.append(area.center)
+    return np.array(points)
+
+    
 
 
-# Uses the `autogenerate: true` flag in the plugin manifest
-# to indicate it should be wrapped as a magicgui to autogenerate
-# a widget.
-def example_function_widget(img_layer: "napari.layers.Image"):
-    print(f"you have selected {img_layer}")

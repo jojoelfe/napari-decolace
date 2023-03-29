@@ -2,20 +2,11 @@ name: napari-decolace
 display_name: DeCo-LACE
 contributions:
   commands:
-    - id: napari-decolace.make_qwidget
-      python_name: napari_decolace._widget:ExampleQWidget
-      title: Make example QWidget
     - id: napari-decolace.make_magic_widget
       python_name: napari_decolace._widget:example_magic_widget
       title: Make example magic widget
-    - id: napari-decolace.make_func_widget
-      python_name: napari_decolace._widget:example_function_widget
-      title: Make example function widget
+
   widgets:
-    - command: napari-decolace.make_qwidget
-      display_name: Example QWidget
     - command: napari-decolace.make_magic_widget
       display_name: Example Magic Widget
-    - command: napari-decolace.make_func_widget
-      autogenerate: true
-      display_name: Example Function Widget
+
