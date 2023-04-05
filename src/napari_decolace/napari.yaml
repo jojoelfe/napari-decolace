@@ -5,8 +5,18 @@ contributions:
     - id: napari-decolace.make_magic_widget
       python_name: napari_decolace._widget:example_magic_widget
       title: Make example magic widget
+    - id: napari-decolace.place_center_of_shape
+      python_name: napari_decolace._widget:place_center_of_shape
+      title: Place center of shape
+    - id: napari-decolace.place_hexagonal_cover
+      python_name: napari_decolace._widget:place_hexagonal_cover
+      title: Place hexagonal cover
 
   widgets:
     - command: napari-decolace.make_magic_widget
       display_name: Example Magic Widget
+    - command: napari-decolace.place_center_of_shape
+      display_name: Place center of shape
+    - command: napari-decolace.place_hexagonal_cover
+      display_name: Place hexagonal cover
 
