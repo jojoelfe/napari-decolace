@@ -18,7 +18,9 @@ import napari
 import shapely
 import shapely.affinity
 
-import decolace
+import decolace.acquisition_area
+
+from skimage.transform import warp, AffineTransform
 
 if TYPE_CHECKING:
     import napari
@@ -79,56 +81,23 @@ def place_center_of_shape(areas: napari.layers.Shapes, maps: napari.layers.Image
     return l
 
 
-def hexagonal_cover(polygon, radius):
-    """
-    Compute hexagonal grid covering the input polygon using spheres of the given radius.
 
-    Args:
-        polygon (shapely.geometry.Polygon): Input polygon
-        radius (float): Radius of the spheres
-
-    Returns:
-        numpy.ndarray: Array of center of the spheres that hexagonally cover the polygon
-    """
-
-    # Define a regular hexagon with side length equal to the sphere radius
-    hexagon = shapely.Polygon([(radius*np.cos(angle), radius*np.sin(angle)) for angle in np.linspace(0, 2*np.pi, 7)[:-1]])
-
-    # Compute the bounding box of the polygon
-    minx, miny, maxx, maxy = polygon.bounds
-
-    # Compute the offset required to center the hexagonal grid within the bounding box
-    dx = hexagon.bounds[2] - hexagon.bounds[0]
-    dy = hexagon.bounds[3] - hexagon.bounds[1]
-    offsetx = (maxx - minx - dx) / 2
-    offsety = (maxy - miny - dy) / 2
-
-    # Compute the number of hexagons required in each direction
-    nx = int(np.ceil((maxx - minx - dx/2) / (3*radius))) + 1
-    ny = int(np.ceil((maxy - miny - dy/2) / (dy*3/2))) + 1
-
-    # Create an empty list to store the center points of the hexagons
-    centers = []
-
-    # Loop over each hexagon in the grid and test if it intersects the input polygon
-    for j in range(-ny,ny):
-        y = miny + offsety + (j*radius*3/2)
-        for i in range(-nx,nx):
-            x = minx + offsetx + (i*np.sqrt(3)*radius) + (j%2)*0.5*np.sqrt(3)*radius
-            hexagon_center = shapely.Point(x, y)
-            if polygon.intersects(shapely.affinity.translate(hexagon, xoff=x, yoff=y)):
-                centers.append((x, y))
-
-    return np.array(centers)
 
 
 @magic_factory
 def place_hexagonal_cover(areas: napari.layers.Shapes, maps: napari.layers.Image) -> napari.layers.Points:
-    """Place a point at the center of each shape in the layer."""
+    """This should create the image_shift position for the acquisition. Save
+    them into the decolace state and then plot them on the map.
+    1. Polygon is in image coordinates
+    2. Add to serialEM and then get stage coordinates.
+    3. Convert the stage coordinates to beam-image shift coordinates
+    4. Calculate acquisition positions
+    5. Save the positions into the decolace state
+    6. Convert the image_shift position back to image coordinates"""
     points = []
     order = []
     areas = areas.data
-    for area in areas:
+    for i, area in enumerate(areas):
         
         # area is a array of shape (N,3) which is a list of polygons
         # Calculate the center of mass of the polygon
@@ -138,21 +107,32 @@ def place_hexagonal_cover(areas: napari.layers.Shapes, maps: napari.layers.Image
         if np.sum(area[:,0] - map_id) != 0:
             raise("Error: Map ID is not the same for all points in the polygon")
         polygon = shapely.geometry.Polygon(area[:,1:3])
-        print(polygon)
-        centers = hexagonal_cover(polygon, 50)
-        for i, center in enumerate(centers):
-            points.append(np.array([map_id,center[0], center[1]]))
-            order.append(i+1)
-    print(np.array(points))
-   
-    features = {
-        'order': np.array(order),
-    }
+
+        acquisition_area = decolace.acquisition_area.AcquisitionAreaSingle(f"area_{i}", "/groups/elferich/decolace_test",beam_radius=0.42,tilt=-20)
+        acquisition_area.initialize_from_napari(maps.metadata["decolace_map_navids"][int(map_id)], [polygon.centroid.y, polygon.centroid.x], area[:,1:3])
+        acquisition_area.calculate_acquisition_positions_from_napari()
+        acquisition_area.write_to_disk()
+
+        # Calculate the affine transformation between area[:,1:3] and
+        # acquisition_area.state["corner_positions_specimen"]
+        
+        transform = AffineTransform()
+        transform.estimate(area[:,1:3], acquisition_area.state["corner_positions_specimen"])
+
+        center = transform.inverse(acquisition_area.state["acquisition_positions"])
+
+
+
+    # Calculate the affine transformation from     
+    return None
+    #features = {
+    #    'order': np.array(order),
+    #}
 
     # define the color cycle for the face_color annotation
-    face_color_cycle = ['blue', 'green']
+    #face_color_cycle = ['blue', 'green']
 
-    text = {
+    write_to_disktext = {
         'string': '{order}',
         'size': 20,
         'color': 'white',
