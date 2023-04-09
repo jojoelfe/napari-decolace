@@ -19,6 +19,7 @@ import shapely
 import shapely.affinity
 
 import decolace.acquisition_area
+import decolace.grid
 
 from skimage.transform import warp, AffineTransform
 
@@ -35,7 +36,6 @@ except ImportError:
 
 @magic_factory
 def example_magic_widget() -> napari.layers.Image:
-    serialem.ConnectToSEM(48888, "146.189.163.56")
     print(serialem.ReportNavFile())
     num_items = serialem.ReportNumTableItems()
     print(num_items)
@@ -97,6 +97,8 @@ def place_hexagonal_cover(areas: napari.layers.Shapes, maps: napari.layers.Image
     points = []
     order = []
     areas = areas.data
+    grid = decolace.grid.grid("THP1_blabla","X:\Johannes_20230407\THP1_blabla",0.42,-15)
+    grid.load_from_disk()
     for i, area in enumerate(areas):
         
         # area is a array of shape (N,3) which is a list of polygons
@@ -112,16 +114,18 @@ def place_hexagonal_cover(areas: napari.layers.Shapes, maps: napari.layers.Image
         acquisition_area.initialize_from_napari(maps.metadata["decolace_map_navids"][int(map_id)], [polygon.centroid.y, polygon.centroid.x], area[:,1:3])
         acquisition_area.calculate_acquisition_positions_from_napari()
         acquisition_area.write_to_disk()
+        grid.state["acquisition_areas"].append([acquisition_area.name,acquisition_area.directory])
 
         # Calculate the affine transformation between area[:,1:3] and
         # acquisition_area.state["corner_positions_specimen"]
         
         transform = AffineTransform()
+        # This way the transfer should take care of switching X and Y
         transform.estimate(area[:,1:3], acquisition_area.state["corner_positions_specimen"])
 
         center = transform.inverse(acquisition_area.state["acquisition_positions"])
 
-
+    grid.write_to_disk()
 
     # Calculate the affine transformation from     
     return None
